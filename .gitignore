@@ -1,0 +1,7 @@
+data/
+data.*/
+.env*
+node_modules/
+*.tmp
+.claude/
+.impeccable/

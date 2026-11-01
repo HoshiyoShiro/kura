@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<title>Notepad</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4-4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/></symbol>
+</svg>
+
+<form id="login" hidden>
+  <h1>Notepad</h1>
+  <p class="hint">Locked. Nothing is shown until you unlock.</p>
+  <label for="pass">Passphrase</label>
+  <input id="pass" type="password" autocomplete="current-password" required>
+  <p class="err" id="loginerr" role="alert"></p>
+  <button class="btn pri" type="submit">Unlock</button>
+</form>
+
+<aside id="app" hidden>
+  <div class="side-top">
+    <label class="search" for="q">
+      <svg class="ic"><use href="#i-search"/></svg>
+      <input id="q" type="search" placeholder="Search notes" autocomplete="off" aria-label="Search notes">
+    </label>
+    <button class="btn pri" id="new" type="button"><svg class="ic"><use href="#i-plus"/></svg>New</button>
+  </div>
+  <div class="tags" id="tags" aria-label="Tags"></div>
+  <div id="list" class="list" aria-live="polite"></div>
+  <div class="side-foot">
+    <button class="btn quiet" id="cfg" type="button"><svg class="ic"><use href="#i-gear"/></svg>Settings</button>
+    <button class="btn quiet" id="out" type="button"><svg class="ic"><use href="#i-lock"/></svg>Lock</button>
+  </div>
+</aside>
+
+<main id="main" hidden></main>
+<div id="toast" role="status" hidden></div>
+<script src="/markdown.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
