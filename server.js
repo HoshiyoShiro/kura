@@ -15,6 +15,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const S = require('./search');
 
 const PORT = process.env.PORT === undefined ? 4546 : Number(process.env.PORT);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -38,6 +39,7 @@ const AUDIT_MAX = Number(process.env.AUDIT_MAX_BYTES) || 1e6;
 const AUDIT_FILE = path.join(DATA_DIR, 'audit.log');
 const FULL_PAGE_CHARS = Number(process.env.FULL_PAGE_MAX_CHARS) || 5e6;
 const DEFAULT_LIMIT = 100, MAX_LIMIT = 500;
+const TEXT_MAX = 20000; // characters per /text or /section response
 
 fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
 
@@ -190,12 +192,12 @@ function parseNote(id, plain) {
 }
 function readNote(id) {
   try { return parseNote(id, decrypt(JSON.parse(fs.readFileSync(noteFile(id), 'utf8')), id)); }
-  catch (e) { if (e.code !== 'ENOENT') cache = null; return null; } // damaged file: rebuild the cache so it is counted as skipped
+  catch (e) { if (e.code !== 'ENOENT') dropCache(); return null; } // damaged file: rebuild the cache so it is counted as skipped
 }
 function saveNote(n) {
   const { id, ...rest } = n;
   writeSecure(noteFile(id), JSON.stringify(encrypt(JSON.stringify(rest), id)));
-  if (cache) cache.set(id, n);
+  if (cache) { cache.set(id, n); index.upsert(n); }
   return n;
 }
 const noteIds = () => fs.readdirSync(NOTES_DIR).filter(f => f.endsWith('.enc') && ID_RE.test(f.slice(0, -4))).map(f => f.slice(0, -4));
@@ -212,30 +214,30 @@ function readEverything() { // fresh read of every file; damaged ones are counte
   return { notes, skipped };
 }
 // In-memory cache of decrypted notes: built on first use, kept current by save/delete, dropped on passphrase change.
-let cache = null, cacheSkipped = 0;
+// The search index (search.js) is built from the cache and kept in step with it: always both or neither.
+let cache = null, index = null, cacheSkipped = 0;
+const dropCache = () => { cache = null; index = null; };
 function cachedNotes() {
   if (!cache) {
     const { notes, skipped } = readEverything();
     cache = new Map(notes.map(n => [n.id, n])); cacheSkipped = skipped;
+    index = S.createIndex(); for (const n of notes) index.add(n);
   }
   return [...cache.values()].sort(byUpdated);
 }
 const httpErr = (status, msg) => Object.assign(new Error(msg), { status });
 
-function search(notes, q, tag) {
-  if (tag) notes = notes.filter(n => n.tags.includes(tag.toLowerCase()));
-  if (!q) return notes;
-  const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
-  return notes.map(n => {
-    const t = n.title.toLowerCase(), b = n.body.toLowerCase(), g = n.tags.join(' ');
-    let score = 0;
-    for (const w of terms) {
-      const s = (t.includes(w) ? 5 : 0) + (g.includes(w) ? 3 : 0) + (b.includes(w) ? 1 : 0);
-      if (!s) return null;
-      score += s;
-    }
-    return { n, score };
-  }).filter(Boolean).sort((a, b) => b.score - a.score).map(x => x.n);
+// Without q: newest first (optionally one tag). With q: BM25 ranking over title, tags and body (search.js).
+// ai=true hides private notes inside the index query itself, so they cannot affect scores or counts.
+function search(q, tag, ai) {
+  const all = cachedNotes();
+  if (!q) {
+    const t = tag.toLowerCase();
+    return { notes: all.filter(n => !(ai && n.private) && (!t || n.tags.includes(t))), scores: null, query: null };
+  }
+  const r = index.search(q, { includePrivate: !ai, tag });
+  const scores = new Map(r.hits.map(h => [h.id, h.score]));
+  return { notes: r.hits.map(h => cache.get(h.id)), scores, query: r.query };
 }
 const tagIndex = notes => {
   const m = new Map(); // not a plain object: tags like 'constructor' or '__proto__' must count normally
@@ -311,7 +313,7 @@ function changePassphrase(next) {
     console.error('Passphrase change aborted:', e.message);
     throw httpErr(500, 'Could not re-encrypt your notes (a note file may be damaged). Nothing was changed.');
   }
-  KEY = key; SALT = salt; cache = null;
+  KEY = key; SALT = salt; dropCache();
   finishSwap(); // if this throws, the next start finishes it (use the new passphrase)
 }
 
@@ -444,13 +446,18 @@ async function route(req, res) {
   }
 
   if (p === '/api/notes' && req.method === 'GET') {
-    const list = search(cachedNotes().filter(visible), url.searchParams.get('q') || '', url.searchParams.get('tag') || '');
+    const found = search((url.searchParams.get('q') || '').trim(), url.searchParams.get('tag') || '', ai), list = found.notes;
     const limit = parseLimit(url.searchParams.get('limit')), start = parseCursor(url.searchParams.get('cursor'));
     const full = url.searchParams.get('full') === '1';
     let page = list.slice(start, start + limit);
     if (full) { let chars = 0; const keep = page.findIndex(n => (chars += n.body.length) > FULL_PAGE_CHARS); if (keep >= 0) page = page.slice(0, Math.max(keep, 1)); } // bound the response size; "next" covers the rest
     const next = start + page.length < list.length ? Buffer.from('o' + (start + page.length)).toString('base64url') : null;
-    return send(res, 200, { notes: page.map(n => view(n, full)), next, skipped: cacheSkipped });
+    const rows = page.map(n => {
+      const v = view(n, full);
+      if (found.scores) { v.score = Math.round(found.scores.get(n.id) * 100) / 100; v.snippets = S.snippets(n, found.query); }
+      return v;
+    });
+    return send(res, 200, { notes: rows, next, skipped: cacheSkipped });
   }
   if (p === '/api/notes' && req.method === 'POST') {
     const b = await readBody(req);
@@ -467,6 +474,37 @@ async function route(req, res) {
   }
   if (p === '/api/tags' && req.method === 'GET') return send(res, 200, { tags: tagIndex(cachedNotes().filter(visible)) });
 
+  const sm = p.match(/^\/api\/notes\/([^/]+)\/(outline|section|text)$/);
+  if (sm && req.method === 'GET') {
+    if (!ID_RE.test(sm[1])) throw httpErr(400, 'Invalid id');
+    const n = readNote(sm[1]);
+    if (!visible(n)) throw httpErr(404, 'Note not found');
+    const body = n.body || '', sp = url.searchParams;
+    if (sm[2] === 'outline') {
+      return send(res, 200, { id: n.id, title: n.title, sections: S.parseSections(body).map(({ heading, level, start, length, index }) => ({ heading, level, start, length, index })) });
+    }
+    if (sm[2] === 'section') {
+      const secs = S.parseSections(body), h = sp.get('heading'), ix = sp.get('index');
+      let sec;
+      if (h !== null && h !== '') {
+        const want = h.trim().toLowerCase();
+        sec = secs.find(s => s.heading === h.trim()) || secs.find(s => s.heading.toLowerCase() === want);
+      } else if (ix !== null) {
+        if (!/^\d{1,6}$/.test(ix)) throw httpErr(400, 'index must be a whole number');
+        sec = secs[Number(ix)];
+      } else throw httpErr(400, 'Give heading or index. See the outline for both.');
+      if (!sec) throw httpErr(404, 'Section not found. Check the outline for the exact headings.');
+      const t = S.sliceText(body, sec.start, Math.min(sec.length, TEXT_MAX)), out = { heading: sec.heading, text: t.text, index: sec.index, level: sec.level, start: sec.start, length: sec.length };
+      if (sec.length > TEXT_MAX) { out.truncated = true; out.next = t.offset + t.text.length; } // continue with /text?offset=next
+      return send(res, 200, out);
+    }
+    const off = sp.get('offset') === null ? 0 : Number(sp.get('offset')), lim = sp.get('limit') === null ? TEXT_MAX : Number(sp.get('limit'));
+    if (!Number.isInteger(off) || off < 0) throw httpErr(400, 'offset must be a whole number, 0 or more');
+    if (!Number.isInteger(lim) || lim < 1) throw httpErr(400, 'limit must be a whole number, 1 or more');
+    const limit = Math.min(lim, TEXT_MAX), t = S.sliceText(body, Math.min(off, body.length), limit), end = t.offset + t.text.length;
+    return send(res, 200, { id: n.id, offset: t.offset, limit, total: body.length, text: t.text, next: end < body.length ? end : null });
+  }
+
   const m = p.match(/^\/api\/notes\/([^/]+)$/);
   if (m) {
     const id = m[1];
@@ -474,7 +512,7 @@ async function route(req, res) {
     if (!ID_RE.test(id)) throw httpErr(400, 'Invalid id');
     if (req.method === 'DELETE') { // no decrypt needed: a damaged note file must still be deletable
       if (!fs.existsSync(noteFile(id))) throw httpErr(404, 'Note not found');
-      fs.unlinkSync(noteFile(id)); if (cache && cache.has(id)) cache.delete(id); else cache = null; // unknown or damaged: rebuild so the skipped count stays right
+      fs.unlinkSync(noteFile(id)); if (cache && cache.has(id)) { cache.delete(id); index.remove(id); } else dropCache(); // unknown or damaged: rebuild so the skipped count stays right
       audit('note_delete', scope, req, { id });
       return send(res, 200, { ok: true });
     }

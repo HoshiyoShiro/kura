@@ -81,12 +81,17 @@ async function refresh() {
     ? `<button class="chip ${state.tag ? '' : 'on'}" data-t="" aria-pressed="${!state.tag}">All</button>` + tags.map(t =>
       `<button class="chip ${t.tag === state.tag ? 'on' : ''}" data-t="${esc(t.tag)}" aria-pressed="${t.tag === state.tag}">${esc(t.tag)}<b>${t.count}</b></button>`).join('')
     : '';
-  const rows = notes.map(n => `
+  const searching = !!state.q.trim();
+  const rows = notes.map(n => {
+    const sn = searching && n.snippets && n.snippets[0]; // best passage while searching, plain preview otherwise
+    return `
     <button class="note-row" data-id="${esc(n.id)}" ${n.id === state.sel ? 'aria-current="true"' : ''}>
       <span class="r-title">${n.private ? icon('lock') : ''}<span>${esc(n.title)}</span></span>
-      <span class="r-prev">${esc(plain(dropTitle(n.preview, n.title))) || 'Empty note'}</span>
+      ${sn && sn.heading ? `<span class="r-head">${esc(sn.heading)}</span>` : ''}
+      <span class="r-prev${sn ? ' snip' : ''}">${esc(sn ? sn.text : plain(dropTitle(n.preview, n.title))) || 'Empty note'}</span>
       <span class="r-meta">${n.private ? `<span class="pill priv">${icon('lock')}Private</span>` : `<span class="pill ai">${icon('spark')}Shared with AI</span>`}${n.source === 'ai' ? '<span>by AI</span>' : n.editedBy === 'ai' ? '<span>AI edited</span>' : ''}<time datetime="${esc(n.updated)}">${esc(when(n.updated))}</time></span>
-    </button>`).join('');
+    </button>`;
+  }).join('');
   $('list').innerHTML = rows
     ? rows + (next ? '<div class="more-wrap"><button class="btn" id="more" type="button">Show more notes</button></div>' : '')
     : (state.q || state.tag
