@@ -1,5 +1,5 @@
 'use strict';
-// Search, snippets and section helpers for the notepad server. Pure code, no I/O, zero dependencies.
+// Search, snippets and section helpers for the Kura server. Pure code, no I/O, zero dependencies.
 //
 // Safety notes: no regular expression is ever built from user input, and every pattern applied to note
 // text is linear (no nested or overlapping quantifiers), so a hostile query or note cannot stall the server.

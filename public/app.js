@@ -24,7 +24,7 @@ async function j(url, method, body) {
   try {
     r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined });
   } catch {
-    throw new Error("Can't reach the notepad server. Check that it is running and unlocked.");
+    throw new Error("Can't reach the Kura server. Check that it is running and unlocked.");
   }
   const d = await r.json().catch(() => ({}));
   if (r.status === 401 && d.error === 'Not signed in.') { showLogin(); throw new Error('locked'); }

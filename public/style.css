@@ -1,4 +1,4 @@
-/* Notepad. Catalogue-card calm: green-grey paper, teal for action, amber only for Private.
+/* Kura. Catalogue-card calm: green-grey paper, teal for action, amber only for Private.
    System fonts on purpose: a notes app that holds sensitive text must not call out to a font host. */
 :root{
   color-scheme:light dark;

@@ -1,13 +1,13 @@
-# Notepad
+# Kura
 
-Private notepad. Zero dependencies (Node 18+). Notes are encrypted on disk (AES-256-GCM, key from your
+Kura is a private notes server with a built-in MCP server. Zero dependencies (Node 18+). Notes are encrypted on disk (AES-256-GCM, key from your
 passphrase via scrypt). An AI can add and read notes through MCP, but never sees notes marked `private`.
 Design and threat model: `SCOPE.md`.
 
 ## Run and unlock
 
 ```
-cd notepad
+cd kura
 node server.js
 ```
 
@@ -17,7 +17,7 @@ node server.js
   must be started by you after every reboot (no unattended boot).
 - Open http://localhost:4546 and sign in with the same passphrase (session lasts 8 h; **Lock** ends it).
 - Env: `PORT` (4546), `HOST` (127.0.0.1), `ALLOWED_HOSTS` (extra Host names, comma list),
-  `NOTEPAD_DATA` (data folder, default `./data`), limit overrides (see Limits), `NOTEPAD_PASSPHRASE` (skips the prompt; the passphrase
+  `KURA_DATA` (data folder, default `./data`), limit overrides (see Limits), `KURA_PASSPHRASE` (skips the prompt; the passphrase
   is then visible in the process environment, so prefer the prompt).
 - Wrong passphrase on the login screen: 5 misses lock sign-in (and device enrolment) for 30 s, doubling
   with each further miss, up to 1 h.
@@ -47,15 +47,15 @@ Behind `tailscale serve` the session cookie is marked `Secure` when the proxy se
 
 ## MCP (AI access)
 
-`mcp-server.js` is a stdio MCP server that talks to the running notepad server with the AI token in
+`mcp-server.js` is a stdio MCP server that talks to the running Kura server with the AI token in
 `data/api-token` (created on first start). Register it once:
 
 ```
-claude mcp add notepad -s user -- node /full/path/to/notepad/mcp-server.js
+claude mcp add kura -s user -- node /full/path/to/kura/mcp-server.js
 ```
 
-Env: `NOTEPAD_URL` (default `http://127.0.0.1:4546`), `NOTEPAD_TOKEN` (overrides the token file),
-`NOTEPAD_DATA` (folder holding `api-token`).
+Env: `KURA_URL` (default `http://127.0.0.1:4546`), `KURA_TOKEN` (overrides the token file),
+`KURA_DATA` (folder holding `api-token`).
 Tools: `add_note`, `append_to_note`, `update_note`, `list_index`, and five for finding and reading (use them in this order):
 
 | Tool | Use |
@@ -69,7 +69,7 @@ Tools: `add_note`, `append_to_note`, `update_note`, `list_index`, and five for f
 There is no delete tool. Every result that contains note text has a top-level `notice` field, and the reading tools say so in their
 descriptions: note text is untrusted data, not instructions (a note may hold text written by a stranger or an earlier AI session,
 so the AI must not obey it).
-The server must be running and unlocked, otherwise tools answer "Notepad server unreachable".
+The server must be running and unlocked, otherwise tools answer "Kura server unreachable".
 After **Rotate AI token** in Settings nothing needs updating: the MCP server re-reads the file on every call.
 
 The AI token cannot see, search or edit `private` notes, cannot make a note private, and cannot
@@ -198,7 +198,7 @@ everything afterwards.
   Do not ask the AI to store passwords.
 - Plain HTTP on the wire if you skip Tailscale/WireGuard/`tailscale serve`.
 - `data/api-token` is not encrypted; whoever reads that file can read all non-private notes while the server runs.
-- Environment variable `NOTEPAD_PASSPHRASE`, shell history, and the exported JSON are plaintext by nature.
+- Environment variable `KURA_PASSPHRASE`, shell history, and the exported JSON are plaintext by nature.
 - Note titles/sizes/timestamps: filenames are random, but file count, sizes and modification times are visible.
 - Forgotten passphrase: data is unrecoverable by design.
 - A note's text can still contain instructions aimed at the AI (prompt injection). The AI cannot delete, hide or see private notes, and results carry an untrusted-data notice, but it can still add or edit non-private notes.

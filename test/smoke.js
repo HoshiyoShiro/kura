@@ -718,7 +718,7 @@ async function main() {
   });
   const call = async (name, args) => { const m = await rpc('tools/call', { name, arguments: args }); const t = m.result.content[0].text; let j; try { j = JSON.parse(t); } catch { /* text */ } return { err: !!m.result.isError, text: t, json: j }; };
   const init = await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'test', version: '0' } });
-  eq(init.result.serverInfo.name, 'notepad', 'initialize handshake');
+  eq(init.result.serverInfo.name, 'kura', 'initialize handshake');
   mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
   const tl = (await rpc('tools/list')).result.tools.map(t => t.name).sort();
   eq(tl.join(), 'add_note,append_to_note,get_note,get_note_outline,get_note_section,list_index,read_note_text,search_notes,update_note', 'tools/list');

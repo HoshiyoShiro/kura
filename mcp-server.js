@@ -1,18 +1,19 @@
 #!/usr/bin/env node
-// Zero-dependency MCP server (stdio, newline-delimited JSON-RPC) for the notepad server.
-// Auth: bearer token from NOTEPAD_TOKEN, else read from data/api-token next to this file.
-// Env: NOTEPAD_URL (default http://127.0.0.1:4546), NOTEPAD_TOKEN, NOTEPAD_DATA (folder holding api-token)
+// Zero-dependency MCP server (stdio, newline-delimited JSON-RPC) for the Kura server.
+// Auth: bearer token from KURA_TOKEN, else read from data/api-token next to this file.
+// Env: KURA_URL (default http://127.0.0.1:4546), KURA_TOKEN, KURA_DATA (folder holding api-token); the older NOTEPAD_* names still work
 // The AI can only see notes NOT marked private in the web app, and cannot delete notes (no tool, and the
 // server refuses the AI token on DELETE).
 
 const fs = require('fs');
 const path = require('path');
-const BASE = (process.env.NOTEPAD_URL || 'http://127.0.0.1:4546').replace(/\/+$/, '');
+const ENV = n => (process.env['KURA_' + n] !== undefined ? process.env['KURA_' + n] : process.env['NOTEPAD_' + n]); // NOTEPAD_* still works
+const BASE = (ENV('URL') || 'http://127.0.0.1:4546').replace(/\/+$/, '');
 
 function token() {
-  if (process.env.NOTEPAD_TOKEN) return process.env.NOTEPAD_TOKEN.trim();
-  try { return fs.readFileSync(path.join(process.env.NOTEPAD_DATA || path.join(__dirname, 'data'), 'api-token'), 'utf8').trim(); }
-  catch { throw new Error('No token. Start the notepad server once, or set NOTEPAD_TOKEN.'); }
+  if (ENV('TOKEN')) return ENV('TOKEN').trim();
+  try { return fs.readFileSync(path.join(ENV('DATA') || path.join(__dirname, 'data'), 'api-token'), 'utf8').trim(); }
+  catch { throw new Error('No token. Start the Kura server once, or set KURA_TOKEN.'); }
 }
 
 async function api(p, method = 'GET', body) {
@@ -25,7 +26,7 @@ async function api(p, method = 'GET', body) {
     });
   } catch (e) {
     if (e.message.startsWith('No token')) throw e;
-    throw new Error('Notepad server unreachable. Is it running and unlocked? (' + BASE + ')');
+    throw new Error('Kura server unreachable. Is it running and unlocked? (' + BASE + ')');
   }
   const text = await res.text();
   let data; try { data = JSON.parse(text); } catch { data = text; }
@@ -129,7 +130,7 @@ async function handle(msg) {
   try {
     if (method === 'initialize') return send({ jsonrpc: '2.0', id, result: {
       protocolVersion: (params && params.protocolVersion) || '2025-03-26',
-      capabilities: { tools: {} }, serverInfo: { name: 'notepad', version: '2.0.0' } } });
+      capabilities: { tools: {} }, serverInfo: { name: 'kura', version: '2.0.0' } } });
     if (method === 'ping') return send({ jsonrpc: '2.0', id, result: {} });
     if (method === 'tools/list') return send({ jsonrpc: '2.0', id, result: { tools:
       Object.entries(TOOLS).map(([name, t]) => ({ name, description: t.description, inputSchema: t.inputSchema })) } });

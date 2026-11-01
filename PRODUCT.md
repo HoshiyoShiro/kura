@@ -10,7 +10,7 @@ web
 One person, the owner, who self-hosts the server. They use it from a desktop browser and from a phone, over Tailscale. They keep a mix of quick notes an AI wrote for them and personal or sensitive notes they wrote themselves. No sharing, no teams.
 
 ## Product Purpose
-A private, indexed notepad. The owner asks an AI (through MCP) to take notes, and reads, searches, edits and curates them in a web app. Success: finding a note in seconds, and never wondering what the AI can see.
+Kura is a private, indexed notes app. The owner asks an AI (through MCP) to take notes, and reads, searches, edits and curates them in a web app. Success: finding a note in seconds, and never wondering what the AI can see.
 
 ## Positioning
 Self-hosted, encrypted at rest, with a per-note Private switch that makes a note invisible to the AI. Notes, search, tags and the AI's access are controlled from one screen.

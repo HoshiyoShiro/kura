@@ -1,4 +1,4 @@
-// Notepad server: zero dependencies, encrypted at rest, authenticated.
+// Kura server: zero dependencies, encrypted at rest, authenticated.
 //
 // Threat model: someone gets a copy of data/ (backup, stolen disk, synced folder) -> unreadable.
 // Someone else on the network / a malicious web page -> cannot read or write without auth.
@@ -6,8 +6,8 @@
 // and note text you choose to show the AI (it goes to the AI provider). Mark those notes private.
 //
 // Env: PORT (4546), HOST (127.0.0.1), ALLOWED_HOSTS (comma list of extra hostnames, e.g. MagicDNS name),
-//      NOTEPAD_PASSPHRASE (optional, avoids the prompt; visible in the process environment),
-//      NOTEPAD_DATA (data folder, default ./data), LOCKOUT_BASE_MS (default 30000, mainly for tests).
+//      KURA_PASSPHRASE (optional, avoids the prompt; visible in the process environment),
+//      KURA_DATA (data folder, default ./data; the older NOTEPAD_* names still work), LOCKOUT_BASE_MS (default 30000, mainly for tests).
 // Limits (env overrides, mainly for tests): RATE_LIMIT_PER_MIN (300), RATE_LIMIT_AI_WRITES_PER_MIN (30),
 //      NOTE_MAX_CHARS (200000), NOTE_MAX_COUNT (5000), AUDIT_MAX_BYTES (1000000),
 //      FULL_PAGE_MAX_CHARS (5000000, body characters per full=1 page).
@@ -15,12 +15,13 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const ENV = n => (process.env['KURA_' + n] !== undefined ? process.env['KURA_' + n] : process.env['NOTEPAD_' + n]); // NOTEPAD_* still works
 const S = require('./search');
 
 const PORT = process.env.PORT === undefined ? 4546 : Number(process.env.PORT);
 const HOST = process.env.HOST || '127.0.0.1';
 const EXTRA_HOSTS = (process.env.ALLOWED_HOSTS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-const DATA_DIR = path.resolve(process.env.NOTEPAD_DATA || path.join(__dirname, 'data'));
+const DATA_DIR = path.resolve(ENV('DATA') || path.join(__dirname, 'data'));
 const NOTES_DIR = path.join(DATA_DIR, 'notes');
 const NOTES_NEW = NOTES_DIR + '.new', NOTES_OLD = NOTES_DIR + '.old';
 const META_FILE = path.join(DATA_DIR, 'meta.json');
@@ -112,7 +113,7 @@ function writeSecure(file, text) {
 function promptHidden(q) {
   return new Promise(resolve => {
     const stdin = process.stdin;
-    if (!stdin.isTTY) { console.error('No TTY: set NOTEPAD_PASSPHRASE or run in a terminal.'); process.exit(1); }
+    if (!stdin.isTTY) { console.error('No TTY: set KURA_PASSPHRASE or run in a terminal.'); process.exit(1); }
     process.stdout.write(q);
     stdin.setRawMode(true); stdin.resume(); stdin.setEncoding('utf8');
     let s = '';
@@ -134,18 +135,19 @@ async function unlock() {
   if (fs.existsSync(META_FILE)) {
     const meta = JSON.parse(fs.readFileSync(META_FILE, 'utf8'));
     for (let tries = 0; tries < 5; tries++) {
-      const pass = process.env.NOTEPAD_PASSPHRASE || await promptHidden('Passphrase: ');
+      const pass = ENV('PASSPHRASE') || await promptHidden('Passphrase: ');
       const key = deriveKey(pass, Buffer.from(meta.salt, 'base64'));
       try {
+        // 'notepad-ok' is the verifier text inside existing meta.json files: do not rename it or existing data will not unlock.
         if (decrypt(meta.verifier, 'meta', key) === 'notepad-ok') { KEY = key; SALT = Buffer.from(meta.salt, 'base64'); return; }
       } catch { /* wrong */ }
       console.error('Wrong passphrase.');
-      if (process.env.NOTEPAD_PASSPHRASE) process.exit(1);
+      if (ENV('PASSPHRASE')) process.exit(1);
     }
     process.exit(1);
   }
   console.log('First run: choose a passphrase. It encrypts every note and CANNOT be recovered if forgotten.');
-  let pass = process.env.NOTEPAD_PASSPHRASE;
+  let pass = ENV('PASSPHRASE');
   if (!pass) {
     pass = await promptHidden('New passphrase (12+ chars): ');
     if (pass !== await promptHidden('Repeat passphrase: ')) { console.error('Did not match.'); process.exit(1); }
@@ -442,7 +444,7 @@ async function route(req, res) {
     noAI();
     audit('export', scope, req);
     return send(res, 200, { exported: new Date().toISOString(), notes: readEverything().notes.sort(byUpdated) },
-      { 'Content-Disposition': `attachment; filename="notepad-export-${new Date().toISOString().slice(0, 10)}.json"` });
+      { 'Content-Disposition': `attachment; filename="kura-export-${new Date().toISOString().slice(0, 10)}.json"` });
   }
 
   if (p === '/api/notes' && req.method === 'GET') {
@@ -552,7 +554,7 @@ async function route(req, res) {
       send(res, e.status || 500, { error: e.status ? e.message : 'Server error' }, e.headers || {});
     }
   }).listen(PORT, HOST, () => {
-    console.log(`Notepad unlocked on http://${HOST}:${server.address().port}`);
+    console.log(`Kura unlocked on http://${HOST}:${server.address().port}`);
     console.log(`MCP token file: ${TOKEN_FILE}`);
     if (HOST !== '127.0.0.1' && HOST !== 'localhost') console.log('WARNING: listening beyond localhost. Use Tailscale/VPN only; traffic is plain HTTP.');
   });

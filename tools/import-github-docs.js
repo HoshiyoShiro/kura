@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Import the markdown docs of your GitHub repos into the notepad: ONE note per repo ("GitHub: <repo>"),
+// Import the markdown docs of your GitHub repos into Kura: ONE note per repo ("GitHub: <repo>"),
 // with a contents list and each file as a section, so the note list stays short.
 // Zero dependencies. Safe to re-run: notes are matched by title and updated in place, never duplicated.
 //
@@ -7,7 +7,7 @@
 //   node tools/import-github-docs.js --apply         create/update the notes
 //
 // Options
-//   --root <dir>      folder holding your cloned repos      (default: the folder above notepad/)
+//   --root <dir>      folder holding your cloned repos      (default: the folder above kura/)
 //   --owner <name>    only repos owned by this GitHub user  (default: detected from the most common remote owner)
 //   --remote          also fetch the README of public repos you have not cloned (uses GITHUB_TOKEN if set, else the unauthenticated API)
 //   --skills          also import SKILL.md files and anything under .claude/skills
@@ -15,7 +15,7 @@
 //   --cleanup         delete the older one-note-per-file imports (title "repo: path.md", tag github). Needs a server that lets the
 //                     AI token delete; otherwise delete them in the app (filter by the github tag).
 //
-// Env: NOTEPAD_URL (default http://127.0.0.1:4546), NOTEPAD_TOKEN (default: data/api-token next to this tool's parent folder),
+// Env: KURA_URL (default http://127.0.0.1:4546), KURA_TOKEN (default: data/api-token next to this tool's parent folder),
 //      GITHUB_TOKEN (optional, only for --remote).
 //
 // Notes are created with the AI token, so they are visible to the AI ("Shared"). Files that look like they contain
@@ -24,6 +24,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const ENV = n => (process.env['KURA_' + n] !== undefined ? process.env['KURA_' + n] : process.env['NOTEPAD_' + n]); // NOTEPAD_* still works
 const { execFileSync } = require('child_process');
 
 const args = process.argv.slice(2);
@@ -32,7 +33,7 @@ const opt = (n, d) => { const i = args.indexOf('--' + n); return i >= 0 && args[
 
 const APPLY = flag('apply');
 const ROOT = path.resolve(opt('root', path.join(__dirname, '..', '..')));
-const BASE = (process.env.NOTEPAD_URL || 'http://127.0.0.1:4546').replace(/\/+$/, '');
+const BASE = (ENV('URL') || 'http://127.0.0.1:4546').replace(/\/+$/, '');
 const MAX_FILES = Number(opt('max', 400));
 const MAX_BODY = 190000;       // server cap is 200000 characters per note
 const THROTTLE_MS = 2200;      // stay under 30 AI writes per minute
@@ -96,7 +97,7 @@ function collect() {
 }
 
 async function fetchRemoteReadmes(owner, haveRepos, items, skipped) {
-  const headers = { 'User-Agent': 'notepad-import', Accept: 'application/vnd.github+json', ...(process.env.GITHUB_TOKEN ? { Authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}) };
+  const headers = { 'User-Agent': 'kura-import', Accept: 'application/vnd.github+json', ...(process.env.GITHUB_TOKEN ? { Authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}) };
   const res = await fetch(`https://api.github.com/users/${encodeURIComponent(owner)}/repos?per_page=100&type=owner`, { headers });
   if (!res.ok) { skipped.push(['(remote repo list)', 'GitHub said ' + res.status + (res.status === 403 ? ' (rate limit; set GITHUB_TOKEN)' : '')]); return; }
   const list = await res.json();
@@ -112,7 +113,7 @@ async function fetchRemoteReadmes(owner, haveRepos, items, skipped) {
 }
 
 function tokenValue() {
-  if (process.env.NOTEPAD_TOKEN) return process.env.NOTEPAD_TOKEN.trim();
+  if (ENV('TOKEN')) return ENV('TOKEN').trim();
   try { return fs.readFileSync(path.join(__dirname, '..', 'data', 'api-token'), 'utf8').trim(); } catch { return ''; }
 }
 async function api(p, method = 'GET', body) {
@@ -159,9 +160,9 @@ function groupByRepo(items) {
   console.log(`Markdown files found: ${items.length}  ->  notes to create or update: ${notes.length}`);
   for (const n of notes) console.log(`  ${n.title}  (${n.files} file${n.files === 1 ? '' : 's'}, ${n.body.length} chars)`);
   if (skipped.length) { console.log(`Skipped ${skipped.length}:`); for (const [f, why] of skipped.slice(0, 40)) console.log(`  ${f}  (${why})`); if (skipped.length > 40) console.log(`  ... and ${skipped.length - 40} more`); }
-  if (!APPLY && !flag('cleanup')) { console.log('\nDry run only. Re-run with --apply (notepad server running and unlocked) to import.'); return; }
+  if (!APPLY && !flag('cleanup')) { console.log('\nDry run only. Re-run with --apply (Kura server running and unlocked) to import.'); return; }
 
-  if (!tokenValue()) throw new Error('No AI token. Start the notepad server once, or set NOTEPAD_TOKEN.');
+  if (!tokenValue()) throw new Error('No AI token. Start the Kura server once, or set KURA_TOKEN.');
   const list = await api('/api/notes?tag=github&limit=500&full=1');
   const existing = new Map(list.notes.map(n => [n.title, n]));
   let created = 0, updated = 0, same = 0, failed = 0;

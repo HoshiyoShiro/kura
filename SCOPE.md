@@ -1,9 +1,9 @@
-# Notepad — scope (web + Android)
+# Kura — scope (web + Android)
 
 Status: web server/viewer and the security rewrite are built and tested (325 smoke tests, `node test/smoke.js`). Hardening added: AI cannot delete, note provenance (`source`), pagination + decrypted-note cache, rate limits and size caps, audit log. Android not started. This doc is the gate before more building.
 
 ## Goal
-Private, indexed notepad. User asks an AI (via MCP) to take notes; user reads/edits them in a web app and an Android app. Notes may contain sensitive info, so security outranks features.
+Kura is a private, indexed notes app. User asks an AI (via MCP) to take notes; user reads/edits them in a web app and an Android app. Notes may contain sensitive info, so security outranks features.
 
 ## Threat model
 | Threat | Covered by |
@@ -41,7 +41,7 @@ In scope
 Out of scope v1: WYSIWYG, attachments/images, note links/backlinks, multi-user, sharing, version history, offline.
 
 ## Android app (v1)
-Stack: match quest-log-android — Kotlin, Jetpack Compose, Material 3, Retrofit + OkHttp + kotlinx.serialization, single activity. New project `notepad-android`, package `com.hoshy.notepad`.
+Stack: match quest-log-android — Kotlin, Jetpack Compose, Material 3, Retrofit + OkHttp + kotlinx.serialization, single activity. New project `kura-android`, package `com.hoshy.notepad`.
 
 In scope
 - First run: enter server address(es) + passphrase once → server issues device token → stored in Android Keystore-backed EncryptedSharedPreferences. Passphrase never stored.
@@ -52,7 +52,7 @@ In scope
 - Cleartext: Android blocks plain HTTP by default. Allow only for the configured private/Tailscale hosts via network security config, **or** put the server behind `tailscale serve` (HTTPS) and keep cleartext off. Recommended: HTTPS via tailscale serve.
 - Online-only, like quest-log. Clear "can't reach server" state.
 
-Out of scope v1: offline cache/edit, widgets, share-sheet "save to notepad" (good v2), push, tablets layout.
+Out of scope v1: offline cache/edit, widgets, share-sheet "save to Kura" (good v2), push, tablets layout.
 
 ## Parity table
 | Feature | Web | Android |
@@ -78,4 +78,4 @@ Out of scope v1: offline cache/edit, widgets, share-sheet "save to notepad" (goo
 2. **HTTPS:** `tailscale serve` (recommended) vs cleartext allowlist on Android.
 3. **Forgotten passphrase = data gone.** Accept, or add a printed recovery key?
 4. **Android scope v1:** is online-only OK, or is offline read required?
-5. **Share-sheet "save to notepad"** in v1 or v2?
+5. **Share-sheet "save to Kura"** in v1 or v2?
