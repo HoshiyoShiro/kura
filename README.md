@@ -213,3 +213,7 @@ everything afterwards.
 - A note's text can still contain instructions aimed at the AI (prompt injection). The AI cannot delete, hide or see private notes, and results carry an untrusted-data notice, but it can still add or edit non-private notes.
 - Rate limits and the audit log are in memory / plain files: they slow down and record abuse, they do not stop a determined local attacker.
 - Login lockout is global, so someone who can reach the server can lock you out for a while (they still cannot get in).
+
+## License
+
+MIT. See `LICENSE`.
