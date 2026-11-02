@@ -4,6 +4,15 @@ Kura is a private notes server with a built-in MCP server. Zero dependencies (No
 passphrase via scrypt). An AI can add and read notes through MCP, but never sees notes marked `private`.
 Design and threat model: `SCOPE.md`.
 
+## Screenshots
+
+All three use made-up demo notes, not real ones.
+
+| | | |
+|---|---|---|
+| ![A note open beside the note list](docs/screenshots/notes.png) | ![Search results showing the matching passage](docs/screenshots/search.png) | ![The new-note form with the Private or Shared with AI choice](docs/screenshots/new-note.png) |
+| Each note shows whether the AI can see it. Private notes are locked. | Search shows the matching passage and its section. | New notes start Private. You choose per note. |
+
 ## Run and unlock
 
 ```
